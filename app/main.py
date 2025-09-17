@@ -19,10 +19,10 @@ templates = Jinja2Templates(directory="app/templates")
 @app.on_event("startup")
 def on_startup() -> None:
     # Initialize DB engine early to fail fast if secrets/network are misconfigured
-    init_engine()
     # Initialize Azure Key Vault and Blob service clients as well
-    get_secret_client()
     get_blob_service_client()
+    get_secret_client()
+    init_engine()
 
 
 @app.get("/healthz", response_class=PlainTextResponse)

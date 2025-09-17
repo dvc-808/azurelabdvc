@@ -25,9 +25,7 @@ def get_credential() -> DefaultAzureCredential:
 def get_secret_client() -> SecretClient:
     global _secret_client
     if _secret_client is None:
-        if not settings.key_vault_url:
-            raise RuntimeError("KEY_VAULT_URL is not configured")
-        _secret_client = SecretClient(vault_url=settings.key_vault_url, credential=get_credential())
+        _secret_client = SecretClient(vault_url="https://cuong-keyvault.vault.azure.net", credential=get_credential())
     return _secret_client
 
 
@@ -40,12 +38,10 @@ def get_secret_value(secret_name: str) -> str:
 def get_blob_service_client() -> BlobServiceClient:
     global _blob_service_client
     if _blob_service_client is None:
-        if not settings.storage_account_url:
-            raise RuntimeError("AZURE_STORAGE_ACCOUNT_URL is not configured")
-        _blob_service_client = BlobServiceClient(account_url=settings.storage_account_url, credential=get_credential())
+        _blob_service_client = BlobServiceClient(account_url="https://dvcdangcapvippro.blob.core.windows.net", credential=get_credential())
     return _blob_service_client
 
 
 def get_blob_client(blob_name: str) -> BlobClient:
     service = get_blob_service_client()
-    return service.get_blob_client(container=settings.storage_container_name, blob=blob_name) 
+    return service.get_blob_client(container="profile-image", blob=blob_name) 
