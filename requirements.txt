@@ -1,15 +1,16 @@
-fastapi==0.112.2
-uvicorn[standard]==0.30.6
-Jinja2==3.1.4
+fastapi[standard]
+uvicorn[standard]
+Jinja2
 
 # Azure SDKs
-azure-identity==1.17.1
-azure-keyvault-secrets==4.8.0
-azure-storage-blob==12.21.0
+azure-identity
+azure-keyvault-secrets
+azure-storage-blob
 
 # Database
-SQLAlchemy==2.0.35
-pyodbc==5.1.0
+SQLAlchemy
+pyodbc
 
 # Optional, useful in App Service for production
-gunicorn==23.0.0 
+gunicorn
+python-multipart

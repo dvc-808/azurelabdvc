@@ -73,4 +73,50 @@ def fetch_user_profile(user_id: str) -> Optional[dict]:
             "phone": row["phone"],
             "address": row["address"],
             "photo_blob_name": row["photo_blob_name"],
-        } 
+        }
+
+
+def user_exists(user_id: str) -> bool:
+    engine = get_engine()
+    query = text(
+        """
+        SELECT 1
+        FROM dbo.Users
+        WHERE user_id = :user_id
+        """
+    )
+    with engine.connect() as conn:
+        row = conn.execute(query, {"user_id": user_id}).first()
+        return row is not None
+
+
+def insert_user_profile(
+    user_id: str,
+    name: str,
+    age: Optional[int],
+    phone: Optional[str],
+    address: Optional[str],
+    photo_blob_name: Optional[str],
+) -> None:
+    engine = get_engine()
+    query = text(
+        """
+        INSERT INTO dbo.Users (
+            user_id, name, age, phone, address, photo_blob_name
+        ) VALUES (
+            :user_id, :name, :age, :phone, :address, :photo_blob_name
+        )
+        """
+    )
+    with engine.begin() as conn:
+        conn.execute(
+            query,
+            {
+                "user_id": user_id,
+                "name": name,
+                "age": age,
+                "phone": phone,
+                "address": address,
+                "photo_blob_name": photo_blob_name,
+            },
+        ) 

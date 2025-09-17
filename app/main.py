@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, StreamingResponse, PlainTextResponse
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
+from fastapi.responses import HTMLResponse, StreamingResponse, PlainTextResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from azure.storage.blob import ContentSettings
 
-from .db import fetch_user_profile, init_engine
+from .db import fetch_user_profile, init_engine, user_exists, insert_user_profile
 from .azure_clients import get_blob_client
 
 
@@ -29,6 +30,11 @@ def healthcheck() -> str:
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/users/new", response_class=HTMLResponse)
+def new_user_form(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse("create_user.html", {"request": request})
 
 
 @app.get("/users/{user_id}", response_class=HTMLResponse)
@@ -74,6 +80,56 @@ def get_user_photo(user_id: str):
         pass
 
     return StreamingResponse(stream.chunks(), media_type=content_type)
+
+
+@app.post("/users", response_class=JSONResponse)
+async def create_user(
+    user_id: str = Form(...),
+    name: str = Form(...),
+    age: Optional[int] = Form(None),
+    phone: Optional[str] = Form(None),
+    address: Optional[str] = Form(None),
+    photo: Optional[UploadFile] = File(None),
+):
+    # Check if user already exists
+    if user_exists(user_id):
+        raise HTTPException(status_code=409, detail="User already exists")
+
+    photo_blob_name: Optional[str] = None
+
+    # Upload photo to blob if present
+    if photo is not None:
+        # Choose a blob name convention: users/{user_id}/{original_filename}
+        safe_filename = photo.filename or "photo"
+        blob_name = f"users/{user_id}/{safe_filename}"
+        blob_client = get_blob_client(blob_name)
+        data = await photo.read()
+        content_settings = None
+        if getattr(photo, "content_type", None):
+            content_settings = ContentSettings(content_type=photo.content_type)
+        blob_client.upload_blob(data, overwrite=True, content_settings=content_settings)
+        photo_blob_name = blob_name
+
+    # Insert into database
+    try:
+        insert_user_profile(
+            user_id=user_id,
+            name=name,
+            age=age,
+            phone=phone,
+            address=address,
+            photo_blob_name=photo_blob_name,
+        )
+    except Exception as exc:
+        # Rollback blob if DB insert fails
+        if photo_blob_name:
+            try:
+                get_blob_client(photo_blob_name).delete_blob()
+            except Exception:
+                pass
+        raise HTTPException(status_code=500, detail="Failed to create user") from exc
+
+    return {"status": "created", "user_id": user_id}
 
 
 # Local dev entry point
