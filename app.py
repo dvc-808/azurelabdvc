@@ -25,14 +25,17 @@ mysql_password = secret_client.get_secret(MYSQL_SECRET_NAME).value
  
  
 # # Config Azure Blob
-AZURE_STORAGE_CONNECTION_STRING = "DefaultEndpointsProtocol=https;AccountName=dvcdangcapvippro;AccountKey=IZRNn6sAxUfePlP3PM0dicNr5DNIzP0vj8ktpM7S4JdZDhtdVDg7Ke4gUBet3CLVwrLKKWMkIeEr+ASt1u8pWA==;EndpointSuffix=core.windows.net"
+
 # STORAGE_ACCOUNT_URL = "https://ducstorageblob.blob.core.windows.net"
 STORAGE_ACCOUNT_NAME = "dvcdangcapvippro"
 STORAGE_CONTAINER_NAME = "profile-image"
 BLOB_NAME = "avatar.png"
+SA_CON = "saconstring"
+sacon = secret_client.get_secret(SA_CON).value
  
 # blob_service_client = BlobServiceClient(account_url=STORAGE_ACCOUNT_URL, credential=credential)
-blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
+
+blob_service_client = BlobServiceClient.from_connection_string(sacon)
  
 @app.route("/test-secret")
 def test_secret():
