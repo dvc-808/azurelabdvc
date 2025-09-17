@@ -5,7 +5,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Settings:
     # Key Vault
-    key_vault_url: str = "https://cuong-keyvault.vault.azure.net/"
+    key_vault_url: str = "kv.privatelink.vaultcore.azure.net"
     sql_connection_secret_name: str = "cuongdbstring"
 
     # Storage
