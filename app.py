@@ -21,19 +21,17 @@ host = "mssqlsrvdvcdangcapvippro.mysql.database.azure.com"
 database = "sqldb01"
 user = "dvcdvc"
 mysql_password = secret_client.get_secret(MYSQL_SECRET_NAME).value
-# password = os.getenv("MYSQL_PASSWORD")
  
  
 # # Config Azure Blob
 
-# STORAGE_ACCOUNT_URL = "https://ducstorageblob.blob.core.windows.net"
+
 STORAGE_ACCOUNT_NAME = "dvcdangcapvippro"
 STORAGE_CONTAINER_NAME = "profile-image"
 BLOB_NAME = "avatar.png"
 SA_CON = "saconstring"
 sacon = secret_client.get_secret(SA_CON).value
- 
-# blob_service_client = BlobServiceClient(account_url=STORAGE_ACCOUNT_URL, credential=credential)
+
 
 blob_service_client = BlobServiceClient.from_connection_string(sacon)
  
@@ -43,7 +41,9 @@ def test_secret():
     MYSQL_PASSWORD loaded successfully: {mysql_password} <br>
     https://{STORAGE_ACCOUNT_NAME}.blob.core.windows.net/{STORAGE_CONTAINER_NAME}/{BLOB_NAME}
     """
- 
+@app.route("/health-check")
+def test_secret():
+    return "200"
 @app.route("/")
 def index():
     # Kết nối MySQL
@@ -60,8 +60,6 @@ def index():
     row = cursor.fetchone()
     conn.close()
  
-    # image_url = f"https://{STORAGE_ACCOUNT_NAME}.blob.core.windows.net/{STORAGE_CONTAINER_NAME}/{BLOB_NAME}?{sas_toke…
-    # print("DEBUG SAS URL:", image_url)
  
     blob_client = blob_service_client.get_blob_client(container=STORAGE_CONTAINER_NAME, blob=BLOB_NAME)
     blob_data = blob_client.download_blob().readall()
