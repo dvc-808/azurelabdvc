@@ -127,7 +127,7 @@ async def create_user(
                 get_blob_client(photo_blob_name).delete_blob()
             except Exception:
                 pass
-        raise HTTPException(status_code=500, detail="Failed to create user") from exc
+        raise HTTPException(status_code=500, detail ="Failed to create user") from exc
 
     return {"status": "created", "user_id": user_id}
 
