@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from azure.storage.blob import ContentSettings
 
 from .db import fetch_user_profile, init_engine, user_exists, insert_user_profile
-from .azure_clients import get_blob_client
+from .azure_clients import get_blob_client, get_blob_service_client, get_secret_client
 
 
 app = FastAPI(title="User Profile App", version="1.0.0")
@@ -20,6 +20,9 @@ templates = Jinja2Templates(directory="app/templates")
 def on_startup() -> None:
     # Initialize DB engine early to fail fast if secrets/network are misconfigured
     init_engine()
+    # Initialize Azure Key Vault and Blob service clients as well
+    get_secret_client()
+    get_blob_service_client()
 
 
 @app.get("/healthz", response_class=PlainTextResponse)
@@ -127,7 +130,7 @@ async def create_user(
                 get_blob_client(photo_blob_name).delete_blob()
             except Exception:
                 pass
-        raise HTTPException(status_code=500, detail ="Failed to create user") from exc
+        raise HTTPException(status_code=500, detail="Failed to create user") from exc
 
     return {"status": "created", "user_id": user_id}
 
