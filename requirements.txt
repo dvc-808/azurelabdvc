@@ -1,16 +1,5 @@
-fastapi[standard]
-uvicorn[standard]
-Jinja2
-
-# Azure SDKs
+flask
+mysql-connector-python==8.0.33
+azure-storage-blob
 azure-identity
 azure-keyvault-secrets
-azure-storage-blob
-
-# Database
-SQLAlchemy
-pyodbc
-
-# Optional, useful in App Service for production
-gunicorn
-python-multipart

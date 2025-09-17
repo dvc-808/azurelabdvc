@@ -1,0 +1,81 @@
+from flask import Flask
+import mysql.connector
+from azure.storage.blob import BlobServiceClient
+from azure.identity import DefaultAzureCredential
+import base64
+from azure.keyvault.secrets import SecretClient
+ 
+ 
+app = Flask(__name__)
+ 
+ 
+KEY_VAULT_URL = "https://cuong-keyvault.vault.azure.net/"
+MYSQL_SECRET_NAME = "mysql-password"
+ 
+ 
+credential = DefaultAzureCredential()
+secret_client = SecretClient(vault_url=KEY_VAULT_URL, credential=credential)
+ 
+# Config kết nối trực tiếp tới Azure MySQL
+host = "mssqlsrvdvcdangcapvippro.mysql.database.azure.com"
+database = "sqldb01"
+user = "dvcdvc"
+mysql_password = secret_client.get_secret(MYSQL_SECRET_NAME).value
+# password = os.getenv("MYSQL_PASSWORD")
+ 
+ 
+# # Config Azure Blob
+AZURE_STORAGE_CONNECTION_STRING = "DefaultEndpointsProtocol=https;AccountName=dvcdangcapvippro;AccountKey=IZRNn6sAxUfePlP3PM0dicNr5DNIzP0vj8ktpM7S4JdZDhtdVDg7Ke4gUBet3CLVwrLKKWMkIeEr+ASt1u8pWA==;EndpointSuffix=core.windows.net"
+# STORAGE_ACCOUNT_URL = "https://ducstorageblob.blob.core.windows.net"
+STORAGE_ACCOUNT_NAME = "dvcdangcapvippro"
+STORAGE_CONTAINER_NAME = "profile-image"
+BLOB_NAME = "avatar.png"
+ 
+# blob_service_client = BlobServiceClient(account_url=STORAGE_ACCOUNT_URL, credential=credential)
+blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
+ 
+@app.route("/test-secret")
+def test_secret():
+    return f"""
+    MYSQL_PASSWORD loaded successfully: {mysql_password} <br>
+    https://{STORAGE_ACCOUNT_NAME}.blob.core.windows.net/{STORAGE_CONTAINER_NAME}/{BLOB_NAME}
+    """
+ 
+@app.route("/")
+def index():
+    # Kết nối MySQL
+    conn = mysql.connector.connect(
+        host=host,
+        user=user,
+        password=mysql_password,
+        database=database,
+        port=3306,
+        ssl_disabled=False,
+    )
+    cursor = conn.cursor()
+    cursor.execute("SELECT name, age, phone_number, address FROM person WHERE id = 1")
+    row = cursor.fetchone()
+    conn.close()
+ 
+    # image_url = f"https://{STORAGE_ACCOUNT_NAME}.blob.core.windows.net/{STORAGE_CONTAINER_NAME}/{BLOB_NAME}?{sas_toke…
+    # print("DEBUG SAS URL:", image_url)
+ 
+    blob_client = blob_service_client.get_blob_client(container=STORAGE_CONTAINER_NAME, blob=BLOB_NAME)
+    blob_data = blob_client.download_blob().readall()
+ 
+    img_base64 = base64.b64encode(blob_data).decode("utf-8")
+    img_tag = f'<img src="data:image/png;base64,{img_base64}" alt="User Avatar" width="200">'
+ 
+ 
+    return f"""
+    <h1>User Info</h1>
+    <p>Name: {row[0]}</p>
+    <p>Age: {row[1]}</p>
+    <p>Phone: {row[2]}</p>
+    <p>Address: {row[3]}</p>
+    <h2>Pictures</h2>
+    {img_tag}
+    """
+ 
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
