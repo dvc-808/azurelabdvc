@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>User Profile App</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, sans-serif; margin: 2rem; }
+      .card { max-width: 700px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1.5rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+      input[type=text] { padding: 0.5rem; width: 240px; }
+      button { padding: 0.5rem 0.75rem; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>User Profile App</h1>
+      <p>Enter your user ID to view your profile.</p>
+      <form action="/users/" method="get" onsubmit="event.preventDefault(); window.location='/users/' + document.getElementById('uid').value;">
+        <input id="uid" type="text" placeholder="user id" required />
+        <button type="submit">View Profile</button>
+      </form>
+    </div>
+  </body>
+</html> 

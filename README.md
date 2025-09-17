@@ -1,71 +1,79 @@
 # FastAPI Azure Lab
 
-A FastAPI app demonstrating secure connections to:
-- Azure SQL (private)
-- Azure Key Vault (secrets)
-- Azure Blob Storage (pictures)
+A FastAPI app that reads SQL connection string from Azure Key Vault (secret name `cuongdbstring`), connects to a private Azure SQL Database using pyodbc, and serves user profiles including a photo from Azure Blob Storage. Designed to run on Azure App Service using Managed Identity.
 
-The app uses Managed Identity on Azure App Service to authenticate to Key Vault, Storage (user delegation SAS), and optionally to Azure SQL (AAD token) if the connection string does not include SQL username/password.
+## Features
+- Uses Managed Identity for Key Vault and Storage
+- SQLAlchemy + pyodbc to connect to Azure SQL (ODBC conn string from Key Vault)
+- Jinja2 templates for simple UI
+- Streams user photos from Blob Storage without exposing SAS
 
-## Endpoints
-- `GET /healthz` - health probe
-- `GET /me` - returns the current user's profile and signed URLs to pictures in Blob Storage. The user identity is resolved from:
-  1. `X-MS-CLIENT-PRINCIPAL-ID` (App Service EasyAuth)
-  2. `X-User-Id` header
-  3. `?user_id=` query param (local testing only)
+## Requirements
+- Python 3.10+
+- ODBC Driver 18 for SQL Server installed on the host
+- Network access from App Service to private endpoints via VNet integration
 
-## Data Model
-Expected table `dbo.Users` with columns: `user_id` (PK), `name`, `age`, `phone`, `address`.
+## Environment Variables
+- `KEY_VAULT_URL` (required): e.g. `https://<your-kv-name>.vault.azure.net`
+- `SQL_CONNECTION_SECRET_NAME` (optional): defaults to `cuongdbstring`
+- `AZURE_STORAGE_ACCOUNT_URL` (required): e.g. `https://<storage>.blob.core.windows.net`
+- `AZURE_BLOB_CONTAINER` (optional): defaults to `userphotos`
+- `ENVIRONMENT` (optional): `production` by default
 
-Pictures are stored in Blob Storage under prefix `user_id/` in container `${PHOTOS_CONTAINER}` (default `user-photos`).
+## Database
+Expected table `dbo.Users`:
 
-## Configuration
-Set these environment variables (App Settings in App Service or `.env` locally):
-
-- `KEY_VAULT_URL` = `https://<kv-name>.vault.azure.net/`
-- `STORAGE_ACCOUNT_URL` = `https://<storage>.blob.core.windows.net`
-- `PHOTOS_CONTAINER` = `user-photos`
-- `SQL_KEY_SECRET_NAME` = `cuongdbstring` (or override)
-
-In Key Vault, create a secret named `cuongdbstring` with an ODBC connection string, e.g. one of:
-
-- SQL Auth:
-  `Driver={ODBC Driver 18 for SQL Server};Server=tcp:<server>.database.windows.net,1433;Database=<db>;Uid=<user>;Pwd=<password>;Encrypt=yes;TrustServerCertificate=no;`
-- AAD (Managed Identity):
-  `Driver={ODBC Driver 18 for SQL Server};Server=tcp:<server>.database.windows.net,1433;Database=<db>;Encrypt=yes;TrustServerCertificate=no;`
-
-If using AAD, ensure the App Service Managed Identity has `Azure AD Admin` configured on the SQL Server and `db_datareader` permission on the database.
-
-## Running Locally
-1. Install system dependencies: ODBC Driver 18 for SQL Server and `unixodbc-dev`.
-2. Create and fill `.env` using `.env.example`.
-3. Install Python deps:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+```sql
+CREATE TABLE dbo.Users (
+  user_id NVARCHAR(128) NOT NULL PRIMARY KEY,
+  name NVARCHAR(256) NOT NULL,
+  age INT NULL,
+  phone NVARCHAR(64) NULL,
+  address NVARCHAR(512) NULL,
+  photo_blob_name NVARCHAR(1024) NULL
+);
 ```
 
+The Key Vault secret `cuongdbstring` should contain a full ODBC connection string, e.g.:
+
+```
+Driver={ODBC Driver 18 for SQL Server};Server=tcp:<server>.database.windows.net,1433;Database=<db>;
+Authentication=ActiveDirectoryMsi;Encrypt=yes;TrustServerCertificate=no;
+```
+
+You may include `Application Intent=ReadOnly` if desired. If not using MSI for SQL, you can embed `Uid`/`Pwd` but MSI is recommended.
+
+## Local Development
+1. Install system deps (Ubuntu):
+   - `sudo apt-get update && sudo apt-get install -y unixodbc unixodbc-dev msodbcsql18`
+2. Create venv and install Python deps:
+   - `python -m venv .venv && source .venv/bin/activate`
+   - `pip install -r requirements.txt`
+3. Set env vars for local run (if not using MSI locally):
+   - `export KEY_VAULT_URL=...`
+   - `export AZURE_STORAGE_ACCOUNT_URL=...`
+   - `export AZURE_BLOB_CONTAINER=userphotos`
+   - For local auth, DefaultAzureCredential can use `az login` or env creds.
 4. Run:
+   - `uvicorn app.main:app --reload`
 
-```bash
-uvicorn app.main:app --reload --port 8000
-```
+## Azure App Service Deployment
+- Assign a System-Assigned Managed Identity to the App Service
+- Grant that identity access:
+  - Key Vault: `get` on secrets
+  - Storage Account: `Storage Blob Data Reader` role at account or container
+  - Azure SQL: Create contained user from external provider and grant `db_datareader` (and needed perms)
+- Configure App Settings:
+  - `KEY_VAULT_URL`, `AZURE_STORAGE_ACCOUNT_URL`, `AZURE_BLOB_CONTAINER`
+- VNet integration to reach private endpoints (Key Vault, SQL, Storage)
+- Startup command (optional): `gunicorn -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:8000 app.main:app`
 
-5. Test:
+## Routes
+- `GET /` Home page
+- `GET /users/{user_id}` Profile page
+- `GET /users/{user_id}/photo` Streams photo from Blob Storage
+- `GET /healthz` Health check
 
-```bash
-curl -H 'X-User-Id: alice' http://localhost:8000/me
-```
-
-## Azure Setup Notes
-- Enable System Assigned Managed Identity on the App Service.
-- Grant the identity access:
-  - Key Vault: `get` on secrets.
-  - Storage: `Storage Blob Data Reader` or `Storage Blob Data Contributor` as needed for user delegation SAS.
-  - SQL: If using AAD, assign appropriate database roles. If using SQL Auth, no AAD role needed.
-- For private endpoints, ensure DNS resolution for Key Vault, Storage, and SQL resolves to the private endpoints within your VNet and that App Service has VNet integration.
-
-## Pictures
-Upload user pictures to container `${PHOTOS_CONTAINER}` at path `user_id/<filename>`. The `/me` endpoint returns signed URLs valid for ~10 minutes. 
+## Notes
+- The app initializes the DB on startup to fail fast if secrets or networking are misconfigured.
+- Blob photo is proxied; no SAS token exposure. 
